@@ -1,75 +1,38 @@
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const pino = require('pino');
-const qrcode = require('qrcode-terminal');
-const express = require('express');
 
-const app = express();
-app.use(express.json());
-
-let sock;
-
-async function connectToWhatsApp() {
+async function startSock() {
+    // Oturum klasörünü auth_info_baileys olarak sabitliyoruz
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
-    
-    sock = makeWASocket({
+
+    const sock = makeWASocket({
         auth: state,
-        logger: pino({ level: 'silent' })
-    });
-
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect, qr } = update;
-        
-        if (qr) {
-            console.log("\n========================================");
-            console.log("Lütfen aşağıdaki QR kodu telefonunuzla taratın:");
-            console.log("========================================\n");
-            qrcode.generate(qr, { small: true });
-        }
-
-        if (connection === 'close') {
-            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('Bağlantı koptu, yeniden bağlanılıyor...', shouldReconnect);
-            if (shouldReconnect) {
-                connectToWhatsApp();
-            }
-        } else if (connection === 'open') {
-            console.log('[✔] WhatsApp BULUTTA BAGLANDI!');
-        }
+        printQRInTerminal: true,
+        logger: pino({ level: 'silent' }), // Gereksiz log kirliliğini ve hata şişmesini önler
+        browser: ["Windows", "Chrome", "10.0"] // WhatsApp'ın oturumu yabancı cihaz olarak görüp düşürmesini engeller
     });
 
     sock.ev.on('creds.update', saveCreds);
-}
 
-// 1. Uykuyu Önlemek İçin Ping Rotası (Render'ın uyumasını engeller)
-app.get('/', (req, res) => {
-    res.status(200).send('Bot aktif ve uyanık!');
-});
+    sock.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect, qr } = update;
 
-// 2. Google Sheets'ten Mesaj Gönderme Rotası
-app.post('/send-message', async (req, res) => {
-    try {
-        const { phone, message } = req.body;
-        
-        if (!sock || !sock.user) {
-            return res.status(500).json({ status: 'error', error: 'WhatsApp oturumu henüz hazır değil.' });
+        if (qr) {
+            console.log('📌 Yeni QR Kod üretildi, lütfen telefonunuzdan okutun.');
         }
 
-        const cleanPhone = phone.toString().replace(/[^0-9]/g, '');
-        const jid = `${cleanPhone}@s.whatsapp.net`;
+        if (connection === 'close') {
+            const statusCode = lastDisconnect?.error?.output?.statusCode;
+            console.log(`[!] Bağlantı kapandı (Kod: ${statusCode}), yeniden bağlanılıyor...`);
 
-        console.log(`Mesaj gönderiliyor -> Kime: ${jid}`);
+            // Kod 500 veya çakışmalarda anında döngüye girmemek için 5 sn bekleyip taze başlatıyoruz
+            setTimeout(() => {
+                startSock();
+            }, 5000);
+        } else if (connection === 'open') {
+            console.log('[✔] WhatsApp BAĞLANDI! Canlı kuyruk aktif...');
+        }
+    });
+}
 
-        await sock.sendMessage(jid, { text: message });
-        
-        res.status(200).json({ status: 'success', message: 'Mesaj başarıyla gönderildi!' });
-    } catch (error) {
-        console.error('Mesaj gönderme hatası:', error);
-        res.status(500).json({ status: 'error', error: error.message });
-    }
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Sunucu ${PORT} portunda çalışıyor.`);
-    connectToWhatsApp();
-});
+startSock();
