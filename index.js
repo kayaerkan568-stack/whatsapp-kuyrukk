@@ -40,13 +40,17 @@ async function connectToWhatsApp() {
     sock.ev.on('creds.update', saveCreds);
 }
 
-// Google Sheets'ten gelen istekleri karşılayan tam korumalı API Endpoint
+// Google Sheets'ten gelen istekleri karşılayan kesin korumalı API Endpoint
 app.post('/send-message', async (req, res) => {
     try {
         const { phone, message } = req.body;
         
-        if (!sock) {
-            return res.status(500).json({ status: 'error', error: 'WhatsApp soketi henüz başlatılmadı.' });
+        // WhatsApp oturumu ve kullanıcı ID'si tamamen hazır değilse hata döndür
+        if (!sock || !sock.user || !sock.user.id) {
+            return res.status(500).json({ 
+                status: 'error', 
+                error: 'WhatsApp oturumu henüz tamamen hazır değil. Lütfen 10-15 saniye bekleyip tekrar deneyin.' 
+            });
         }
 
         const cleanPhone = phone.toString().replace(/[^0-9]/g, '');
