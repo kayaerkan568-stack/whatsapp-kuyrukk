@@ -20,12 +20,18 @@ async function connectToWhatsApp() {
         const { connection, lastDisconnect, qr } = update;
         
         if (qr) {
+            console.log("\n========================================");
+            console.log("Lütfen aşağıdaki QR kodu telefonunuzla taratın:");
+            console.log("========================================\n");
             qrcode.generate(qr, { small: true });
         }
 
         if (connection === 'close') {
             const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            if (shouldReconnect) connectToWhatsApp();
+            console.log('Bağlantı koptu, yeniden bağlanılıyor...', shouldReconnect);
+            if (shouldReconnect) {
+                connectToWhatsApp();
+            }
         } else if (connection === 'open') {
             console.log('[✔] WhatsApp BULUTTA BAGLANDI!');
         }
@@ -34,7 +40,7 @@ async function connectToWhatsApp() {
     sock.ev.on('creds.update', saveCreds);
 }
 
-// Google Sheets'ten gelen istekleri yakalayan API Endpoint
+// Google Sheets'ten gelen istekleri karşılayan API Endpoint
 app.post('/send-message', async (req, res) => {
     const { phone, message } = req.body;
     
@@ -45,7 +51,7 @@ app.post('/send-message', async (req, res) => {
     try {
         const jid = phone.includes('@s.whatsapp.net') ? phone : `${phone}@s.whatsapp.net`;
         await sock.sendMessage(jid, { text: message });
-        res.status(200).json({ status: 'success', message: 'Mesaj gönderildi!' });
+        res.status(200).json({ status: 'success', message: 'Mesaj başarıyla gönderildi!' });
     } catch (error) {
         res.status(500).json({ status: 'error', error: error.message });
     }
