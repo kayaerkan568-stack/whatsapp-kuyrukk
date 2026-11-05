@@ -6,25 +6,9 @@ async function connectToWhatsApp() {
     
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false,
+        printQRInTerminal: true, // QR kodu tekrar terminalde açıyoruz
         logger: pino({ level: 'silent' })
     });
-
-    if (!sock.authState.creds.registered) {
-        // Süreyi 6 saniyeye çıkarıyoruz ki bağlantı tamamen kurulsun
-        setTimeout(async () => {
-            try {
-                const phoneNumber = "+905342383008";
-                let code = await sock.requestPairingCode(phoneNumber);
-                console.log(`\n========================================`);
-                let gelenKod = code?.match(/.{1,4}/g)?.join("-") || code;
-                console.log(`WHATSAPP EŞLEŞTİRME KODUNUZ: ${gelenKod}`);
-                console.log(`========================================\n`);
-            } catch (error) {
-                console.log("Eşleştirme kodu alınırken hata oluştu:", error);
-            }
-        }, 6000);
-    }
 
     sock.ev.on('creds.update', saveCreds);
 
