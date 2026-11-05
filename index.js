@@ -40,23 +40,24 @@ async function connectToWhatsApp() {
     sock.ev.on('creds.update', saveCreds);
 }
 
-// Google Sheets'ten gelen istekleri karşılayan kesin korumalı API Endpoint
+// 1. Uykuyu Önlemek İçin Ping Rotası (Render'ın uyumasını engeller)
+app.get('/', (req, res) => {
+    res.status(200).send('Bot aktif ve uyanık!');
+});
+
+// 2. Google Sheets'ten Mesaj Gönderme Rotası
 app.post('/send-message', async (req, res) => {
     try {
         const { phone, message } = req.body;
         
-        // WhatsApp oturumu ve kullanıcı ID'si tamamen hazır değilse hata döndür
-        if (!sock || !sock.user || !sock.user.id) {
-            return res.status(500).json({ 
-                status: 'error', 
-                error: 'WhatsApp oturumu henüz tamamen hazır değil. Lütfen 10-15 saniye bekleyip tekrar deneyin.' 
-            });
+        if (!sock || !sock.user) {
+            return res.status(500).json({ status: 'error', error: 'WhatsApp oturumu henüz hazır değil.' });
         }
 
         const cleanPhone = phone.toString().replace(/[^0-9]/g, '');
         const jid = `${cleanPhone}@s.whatsapp.net`;
 
-        console.log(`Mesaj gönderiliyor -> Kime: ${jid}, Mesaj: ${message}`);
+        console.log(`Mesaj gönderiliyor -> Kime: ${jid}`);
 
         await sock.sendMessage(jid, { text: message });
         
