@@ -40,19 +40,25 @@ async function connectToWhatsApp() {
     sock.ev.on('creds.update', saveCreds);
 }
 
-// Google Sheets'ten gelen istekleri karşılayan API Endpoint
+// Google Sheets'ten gelen istekleri karşılayan tam korumalı API Endpoint
 app.post('/send-message', async (req, res) => {
-    const { phone, message } = req.body;
-    
-    if (!sock) {
-        return res.status(500).json({ status: 'error', error: 'WhatsApp botu henüz hazır değil.' });
-    }
-
     try {
-        const jid = phone.includes('@s.whatsapp.net') ? phone : `${phone}@s.whatsapp.net`;
+        const { phone, message } = req.body;
+        
+        if (!sock) {
+            return res.status(500).json({ status: 'error', error: 'WhatsApp soketi henüz başlatılmadı.' });
+        }
+
+        const cleanPhone = phone.toString().replace(/[^0-9]/g, '');
+        const jid = `${cleanPhone}@s.whatsapp.net`;
+
+        console.log(`Mesaj gönderiliyor -> Kime: ${jid}, Mesaj: ${message}`);
+
         await sock.sendMessage(jid, { text: message });
+        
         res.status(200).json({ status: 'success', message: 'Mesaj başarıyla gönderildi!' });
     } catch (error) {
+        console.error('Mesaj gönderme hatası:', error);
         res.status(500).json({ status: 'error', error: error.message });
     }
 });
