@@ -12,7 +12,7 @@ async function connectToWhatsApp() {
 
     // Eğer daha önce bağlanmadıysa eşleştirme kodu isteyelim
     if (!sock.authState.creds.registered) {
-        const phoneNumber = "+905XXXXXXXXX"; // BURAYA KENDİ TELEFON NUMARANI YAZ (Örnek: +905321234567)
+        const phoneNumber = "+905342383008"; // BURAYA KENDİ TELEFON NUMARANI YAZ (Örnek: +905321234567)
         setTimeout(async () => {
             let code = await sock.requestPairingCode(phoneNumber);
             console.log(`\n========================================`);
