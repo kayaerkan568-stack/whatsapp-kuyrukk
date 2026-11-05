@@ -20,18 +20,12 @@ async function connectToWhatsApp() {
         const { connection, lastDisconnect, qr } = update;
         
         if (qr) {
-            console.log("\n========================================");
-            console.log("Lütfen aşağıdaki QR kodu telefonunuzla taratın:");
-            console.log("========================================\n");
             qrcode.generate(qr, { small: true });
         }
 
         if (connection === 'close') {
             const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('Bağlantı koptu, yeniden bağlanılıyor...', shouldReconnect);
-            if (shouldReconnect) {
-                connectToWhatsApp();
-            }
+            if (shouldReconnect) connectToWhatsApp();
         } else if (connection === 'open') {
             console.log('[✔] WhatsApp BULUTTA BAGLANDI!');
         }
@@ -40,20 +34,20 @@ async function connectToWhatsApp() {
     sock.ev.on('creds.update', saveCreds);
 }
 
-// Google E-Tablodan gelecek mesajları karşılayacak Webhook adresi
+// Google Sheets'ten gelen istekleri yakalayan API Endpoint
 app.post('/send-message', async (req, res) => {
     const { phone, message } = req.body;
     
-    if (!phone || !message) {
-        return res.status(400).send({ success: false, error: 'Telefon numarası ve mesaj içeriği zorunludur!' });
+    if (!sock) {
+        return res.status(500).json({ status: 'error', error: 'WhatsApp botu henüz hazır değil.' });
     }
 
     try {
         const jid = phone.includes('@s.whatsapp.net') ? phone : `${phone}@s.whatsapp.net`;
         await sock.sendMessage(jid, { text: message });
-        res.status(200).send({ success: true, status: 'Mesaj başarıyla gönderildi' });
+        res.status(200).json({ status: 'success', message: 'Mesaj gönderildi!' });
     } catch (error) {
-        res.status(500).send({ success: false, error: error.message });
+        res.status(500).json({ status: 'error', error: error.message });
     }
 });
 
