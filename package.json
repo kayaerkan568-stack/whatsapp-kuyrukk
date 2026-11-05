@@ -1,7 +1,6 @@
 {
   "name": "whatsapp-kuyruk-botu",
   "version": "1.0.0",
-  "description": "WhatsApp Bot with Baileys and QR code",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
