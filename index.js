@@ -6,10 +6,10 @@ const pino = require('pino');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// JSON verilerini okuyabilmek için middleware
 app.use(express.json());
 
-let sock; // WhatsApp soket bağlantısı
+let sock;
+let isConnected = false;
 
 app.get('/', (req, res) => {
   res.send('WhatsApp Bot is running and healthy!');
@@ -19,7 +19,6 @@ app.get('/', (req, res) => {
 app.post('/send-message', async (req, res) => {
   const { phone, message, secretKey } = req.body;
 
-  // Güvenlik Anahtarı Kontrolü (İsteğe bağlı, güvenlik için "mysecret123" belirledik)
   if (secretKey !== "mysecret123") {
     return res.status(401).json({ success: false, error: "Yetkisiz erişim!" });
   }
@@ -28,19 +27,24 @@ app.post('/send-message', async (req, res) => {
     return res.status(400).json({ success: false, error: "Telefon numarası ve mesaj zorunludur." });
   }
 
-  if (!sock || !sock.user) {
-    return res.status(503).json({ success: false, error: "WhatsApp botu şu an bağlı değil." });
+  if (!isConnected || !sock) {
+    return res.status(503).json({ success: false, error: "WhatsApp botu henüz tamamen bağlanmadı, lütfen birkaç saniye bekleyin." });
   }
 
   try {
-    // Telefon numarasını WhatsApp jid formatına dönüştürme (Örn: 905XXXXXXXXX@s.whatsapp.net)
-    let formattedPhone = phone.replace(/[^0-9]/g, '');
+    let formattedPhone = phone.toString().replace(/[^0-9]/g, '');
     if (formattedPhone.startsWith('0')) {
       formattedPhone = '90' + formattedPhone.substring(1);
     } else if (!formattedPhone.startsWith('90') && formattedPhone.length === 10) {
       formattedPhone = '90' + formattedPhone;
     }
     const jid = `${formattedPhone}@s.whatsapp.net`;
+
+    // Numaranın WhatsApp'ta kayıtlı olup olmadığını kontrol et ve zaman aşımını önle
+    await sock.onWhatsApp(jid);
+    
+    // Mesaj göndermeden önce 1 saniye bekle
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     await sock.sendMessage(jid, { text: message });
     console.log(`📤 Mesaj gönderildi -> ${phone}: ${message}`);
@@ -62,7 +66,9 @@ async function connectToWhatsApp() {
   sock = makeWASocket({
     auth: state,
     logger: pino({ level: 'silent' }),
-    browser: Browsers.macOS('Chrome')
+    browser: Browsers.macOS('Chrome'),
+    connectTimeoutMs: 60000, // Zaman aşımı süresini uzattık
+    defaultQueryTimeoutMs: 60000
   });
 
   if (!sock.authState.creds.registered) {
@@ -82,13 +88,15 @@ async function connectToWhatsApp() {
     const { connection, lastDisconnect } = update;
 
     if (connection === 'close') {
+      isConnected = false;
       const shouldReconnect = (lastDisconnect?.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
       console.log('Bağlantı kapandı, yeniden bağlanılıyor: ', shouldReconnect);
       if (shouldReconnect) {
         connectToWhatsApp();
       }
     } else if (connection === 'open') {
-      console.log('✅ WhatsApp botu başarıyla bağlandı!');
+      isConnected = true;
+      console.log('✅ WhatsApp botu başarıyla bağlandı ve hazır!');
     }
   });
 
