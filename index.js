@@ -1,4 +1,4 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const express = require('express');
 const pino = require('pino');
@@ -20,15 +20,24 @@ async function connectToWhatsApp() {
   const sock = makeWASocket({
     auth: state,
     logger: pino({ level: 'silent' }),
-    printQRInTerminal: true
+    browser: Browsers.macOS('Chrome')
   });
 
-  sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect, qr } = update;
+  if (!sock.authState.creds.registered) {
+    const phoneNumber = "905342383008"; 
+    
+    setTimeout(async () => {
+      try {
+        const code = await sock.requestPairingCode(phoneNumber);
+        console.log(`🔑 WHATSAPP EŞLEŞTİRME KODUNUZ: ${code}`);
+      } catch (err) {
+        console.log('Eşleştirme kodu alınamadı:', err);
+      }
+    }, 3000);
+  }
 
-    if (qr) {
-      console.log('📌 Yeni QR Kod üretildi.');
-    }
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect } = update;
 
     if (connection === 'close') {
       const shouldReconnect = (lastDisconnect?.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
